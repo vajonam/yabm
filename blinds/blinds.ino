@@ -33,8 +33,12 @@ free opreation of the blinds.
 
 
 #include <Servo.h> 
+#include <Timer.h>
 
-Servo myservo;  
+
+Servo myservo;
+Timer timer;
+
 
 // create servo object to control a servo 
 
@@ -59,7 +63,7 @@ const int minThreshold = 20;         //close blinds fully at when LDR value reac
 
 const int moveDelay = 500;           //delay to allow servo to move a few degrees based on sunlight
 const int openCloseDelay = 1000;     //delay to allow servo to open or close fully
-const int loopDelay = 150;           //delay between loop reads can increase for faster response 
+const int loopDelay = 75;           //delay between loop reads can increase for faster response 
 
 // global variables
 boolean firstRun = true;            // boolean to store state
@@ -80,6 +84,9 @@ unsigned long total = 0L;       // the running total using long incase of larger
 int average = 0;                // smoothing moving average
 int smoothed = 0;               // weighted expoenential smoothing
 
+// Timers and events
+
+int checkEvent ; 
 
 // Testing Framework
 // #define TESTING_MODE
@@ -109,13 +116,20 @@ void setup()
 
   for (int thisReading = 0; thisReading < numReadings; thisReading++)
     readings[thisReading] = 0;   
+    
+  checkEvent = timer.every(loopDelay, checkLDRandMoveBlinds, (void*)0); 
+  
 
 }
 
 void loop() 
 { 
+  timer.update();
+  
+}
 
-
+void checkLDRandMoveBlinds(void *context) {
+  
   autoMode = (bool) digitalRead(autoSwitch);
   openClose = (bool) digitalRead(openCloseSwitch);
 
@@ -165,9 +179,10 @@ void loop()
 #ifdef TESTING_MODE
   Serial.println(freeRam());
 #endif
-  delay(loopDelay);
-
+ 
 }
+
+
 
 #ifdef TESTING_MODE
 
