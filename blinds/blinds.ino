@@ -40,12 +40,12 @@ Servo myservo;
 
 //arduino pins in use
 
-const int ldrAnalogPin = 0;
-const int servoPin = 2;
-const int autoSwitch = 4;
-const int openCloseSwitch = 5;
-const int ledPin = 6;
-const int ledPin2  = 7;
+const int ldrAnalogPin = 0;    // LDR connected to A0
+const int servoPin = 2;        // Servo connected to D2
+const int autoSwitch = 4;      // Auto Switch connected to D4
+const int openCloseSwitch = 5; // Manual open/close switch connected to D5
+const int closeLED = 6;          // Closed LED connected to D6
+const int openLED  = 7;        // Open LED connected to D7
 
 const int maxServo = 155;       // flly closed blinds 
 const int minServo = 55;        // fully open blinds
@@ -102,8 +102,8 @@ void setup()
   Serial.println("This is free software, and you are welcome to redistribute it");
   Serial.println("under certain conditions;");
 
-  pinMode(ledPin,OUTPUT);
-  pinMode(ledPin2,OUTPUT);
+  pinMode(openLED,OUTPUT);
+  pinMode(closeLED,OUTPUT);
   pinMode(autoSwitch,INPUT_PULLUP);
   pinMode(openCloseSwitch,INPUT_PULLUP);
 
@@ -193,8 +193,8 @@ void close(boolean full) {
       myservo.attach(servoPin);
       myservo.write(maxServo);
       delay(openCloseDelay);
-      digitalWrite(ledPin, HIGH);
-      digitalWrite(ledPin2, LOW);
+      digitalWrite(closeLED, HIGH);
+      digitalWrite(openLED, LOW);
       isClosed = true;
       Serial.println ((String) "Blinds are fully closed");
       prevBlindChangeLdrValue = ldrValue;
@@ -244,8 +244,8 @@ void open() {
     isClosed = false;
     myservo.attach(servoPin);
     myservo.write(minServo);
-    digitalWrite(ledPin, LOW);
-    digitalWrite(ledPin2, HIGH);
+    digitalWrite(closeLED, LOW);
+    digitalWrite(openLED, HIGH);
     delay(openCloseDelay);
     myservo.detach();
     Serial.println("Blinds are fully open");
