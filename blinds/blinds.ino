@@ -202,14 +202,14 @@ void close(boolean full) {
   }
   else {      
 
-    if (prevBlindChangeLdrValue > (new_servoPos + deadBand)) {
+    if (prevBlindChangeLdrValue > (new_servoPos + deadBand)) {  // opening blinds because the increment is > deadBand
       Serial.println ((String) "Opening form : " + (String) prevBlindChangeLdrValue + (String) " to " + (String)   new_servoPos );
       myservo.attach(servoPin);
       myservo.write(new_servoPos);
       delay(moveDelay);
       prevBlindChangeLdrValue =  new_servoPos;
     } 
-    else if (prevBlindChangeLdrValue < (new_servoPos-deadBand)) {
+    else if (prevBlindChangeLdrValue < (new_servoPos-deadBand)) { // close blinds because the decrement is > deadBand
       Serial.println ((String) "Closing form : " + (String) prevBlindChangeLdrValue + (String) " to " + (String)   new_servoPos );        
       myservo.attach(servoPin);
       myservo.write(new_servoPos);
@@ -227,7 +227,7 @@ void close(boolean full) {
         Serial.println ((String) "Dead Band Limit Reached moving " + (String) prevBlindChangeLdrValue + (String) " to " + (String)   new_servoPos );
       }
 
-      // hit dead band
+      // hit dead band, increment counter so if we are just off by less than deadBand and its stable we can move the servo by less than deadBand
       deadBandCounter++;
 
     }
