@@ -1,16 +1,51 @@
+/*
+Yet another Blind Minder - Arudino blind controller
+Copyright (C) 2014 Manojav Sridhar
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+ 
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ 
+
+Arduino Code that opens and closes blinds similar to
+http://homeawesomation.wordpress.com/2013/02/26/automated-window-blinds-with-arduino/
+
+The difference is that input methods are different and the blinds are
+open during reasonable light conditions during the day but closes
+when direct sunlight hits the blinds and also closes at night
+time. This is inteded to be completely automatic and require no
+user intervention to open close the blinds. The blinds close
+gradually as light increase upto max threshold. Also there is code
+devoted to smoothing the LDR inputs to produce a flutter/jitter
+free opreation of the blinds.
+
+ */
+
+
+
 #include <Servo.h> 
 
-Servo myservo;  // create servo object to control a servo 
-// a maximum of eight servo objects can be created 
+Servo myservo;  
+
+// create servo object to control a servo 
 
 //arduino pins in use
 
-const int analogPin = 0;
-const int ledPin = 6;
-const int ledPin2  = 7;
+const int ldrAnalogPin = 0;
 const int servoPin = 2;
 const int autoSwitch = 4;
 const int openCloseSwitch = 5;
+const int ledPin = 6;
+const int ledPin2  = 7;
 
 const int maxServo = 155;       // flly closed blinds 
 const int minServo = 55;        // fully open blinds
@@ -61,6 +96,11 @@ void setup()
 { 
 
   Serial.begin(9600); 
+  Serial.println("Yet Another Blind Minder Copyright (C) 2014 Manojav Sridhar");
+  Serial.println("");
+  Serial.println("This program comes with ABSOLUTELY NO WARRANTY;.");
+  Serial.println("This is free software, and you are welcome to redistribute it");
+  Serial.println("under certain conditions;");
 
   pinMode(ledPin,OUTPUT);
   pinMode(ledPin2,OUTPUT);
@@ -79,10 +119,11 @@ void loop()
   autoMode = (bool) digitalRead(autoSwitch);
   openClose = (bool) digitalRead(openCloseSwitch);
 
-  ldrValue = expSmoothing(analogPin); // weighted smoothing to get rid of noise
 
 #ifdef TESTING_MODE  
   ldrValue = testGenerator();
+#else
+  ldrValue = expSmoothing(ldrAnalogPin); // weighted smoothing to get rid of noise
 #endif
 
   ldrValue = avgSmoothing(ldrValue);    // avg smoothing to get rid of fluctiations 
@@ -176,19 +217,19 @@ void close(boolean full) {
       prevBlindChangeLdrValue =  new_servoPos;
     } 
     else {
-      
+
       if (deadBandCounter > deadBandLimit && prevBlindChangeLdrValue != new_servoPos)  {
-          deadBandCounter = 0;
-          myservo.attach(servoPin);
-          myservo.write(new_servoPos);
-          delay(moveDelay);
-          prevBlindChangeLdrValue =  new_servoPos;
-          Serial.println ((String) "Dead Band Limit Reached moving " + (String) prevBlindChangeLdrValue + (String) " to " + (String)   new_servoPos );
+        deadBandCounter = 0;
+        myservo.attach(servoPin);
+        myservo.write(new_servoPos);
+        delay(moveDelay);
+        prevBlindChangeLdrValue =  new_servoPos;
+        Serial.println ((String) "Dead Band Limit Reached moving " + (String) prevBlindChangeLdrValue + (String) " to " + (String)   new_servoPos );
       }
-      
+
       // hit dead band
       deadBandCounter++;
- 
+
     }
 
   }
@@ -288,22 +329,5 @@ int testGenerator() {
 }
 
 #endif
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
