@@ -1,6 +1,8 @@
+
+
 /*
 Yet another Blind Minder - Arudino blind controller
-Copyright (C) 2014 Manojav Sridhar
+Copyright (C) 2014 vajonam
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -54,12 +56,12 @@ const int openLED  = 7;        // Open LED connected to D7
 const int maxServo = 155;       // flly closed blinds 
 const int minServo = 55;        // fully open blinds
 const int deadBand = 2;         // dead band, if the change to servos is less than this dont move the blinds, prevents fluttering back and forth when light is fluctutating (partly cloudy day)
-const int deadBandLimit = 25;   // if LDR value is less than deadBand for more than this many loops, move the blinds anyway.
+const int deadBandLimit = 75;   // if LDR value is less than deadBand for more than this many loops, move the blinds anyway.
 
 
 const int startCloseThreshold = 480; //start closing blinds when LDR value reaches brightness
 const int endCloseThreshold = 640;   //close blinds fully at when LDR value reaches brightness
-const int minThreshold = 20;         //close blinds fully at when LDR value reaches darkness
+const int minThreshold = 10;         //close blinds fully at when LDR value reaches darkness
 
 const int moveDelay = 500;           //delay to allow servo to move a few degrees based on sunlight
 const int openCloseDelay = 1000;     //delay to allow servo to open or close fully
@@ -89,13 +91,11 @@ int smoothed = 0;               // weighted expoenential smoothing
 int checkEvent ; 
 
 // Testing Framework
-// #define TESTING_MODE
+//#define TESTING_MODE
 
 #ifdef TESTING_MODE
+int t_run_number = 1; 
 int t_counter = 0;
-int t_range = 5; 
-int t_cluster = 10;
-int t_clusterCounter = 0;
 #endif
 
 
@@ -134,12 +134,12 @@ void checkLDRandMoveBlinds(void *context) {
   openClose = (bool) digitalRead(openCloseSwitch);
 
 
+  ldrValue = analogRead(ldrAnalogPin);
 #ifdef TESTING_MODE  
   ldrValue = testGenerator();
 #else
-  ldrValue = expSmoothing(ldrAnalogPin); // weighted smoothing to get rid of noise
 #endif
-
+  ldrValue = expSmoothing(ldrValue); // weighted smoothing to get rid of noise
   ldrValue = avgSmoothing(ldrValue);    // avg smoothing to get rid of fluctiations 
 
 
@@ -177,7 +177,7 @@ void checkLDRandMoveBlinds(void *context) {
   // the loop has run atleast once.
   firstRun = false;
 #ifdef TESTING_MODE
-  Serial.println(freeRam());
+  //Serial.println(freeRam());
 #endif
  
 }
@@ -238,8 +238,8 @@ void close(boolean full) {
         myservo.attach(servoPin);
         myservo.write(new_servoPos);
         delay(moveDelay);
-        prevBlindChangeLdrValue =  new_servoPos;
         Serial.println ((String) "Dead Band Limit Reached moving " + (String) prevBlindChangeLdrValue + (String) " to " + (String)   new_servoPos );
+        prevBlindChangeLdrValue =  new_servoPos;
       }
 
       // hit dead band, increment counter so if we are just off by less than deadBand and its stable we can move the servo by less than deadBand
@@ -272,9 +272,9 @@ void open() {
 
 // taken from credit goes to http://www.tigoe.com/pcomp/code/arduinowiring/41/
 
-int expSmoothing (int inputPin) {
+int expSmoothing (int ldrValue) {
 
-  ldrValue = analogRead(inputPin);
+
 
   if (ldrValue > smoothed)
     smoothed = smoothed + (ldrValue - smoothed)/alpha ;
@@ -325,19 +325,37 @@ int avgSmoothing(int ldrValue) {
 // can be improved on. 
 
 int testGenerator() {
+  int myldrValue = 0;
+  if (t_counter < numReadings*2) {
 
-  int myldrValue = random(t_counter,t_counter+t_range);
-
-  if (t_clusterCounter > t_cluster) {
-    t_counter++;
-    t_clusterCounter = 0;     
+    if (t_run_number == 1)  
+        myldrValue = 0 ;
+    if (t_run_number == 2)
+      myldrValue = minThreshold;
+    if (t_run_number == 3)
+      myldrValue= startCloseThreshold;
+    if (t_run_number == 3)
+      myldrValue= endCloseThreshold;
+     if (t_run_number == 4)
+      myldrValue= 0;
+  
+        
+     
+  } else {
+   t_counter = 0;
+   t_run_number++;
+   
   }
-  t_clusterCounter++;
+  
+   t_counter++;
+  
+  if (t_run_number > 4)
+    t_run_number = 0;
 
-  if ( t_counter > endCloseThreshold+100)
-    t_counter=0;
+  
+  Serial.print((String)" Test ldrValue : " +  (String)  myldrValue );
 
-  Serial.println((String)" Test ldrValue : " +  (String)  myldrValue );
+
 
   return myldrValue;
 
