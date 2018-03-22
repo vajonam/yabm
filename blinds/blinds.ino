@@ -31,20 +31,14 @@
 
 */
 
-
-
 #include <Servo.h>
 #include <Timer.h>
-
-
 
 // create servo object to control a servo
 Servo myservo;
 
 // create a timer to use
 Timer timer;
-
-
 
 //arduino pins in use
 
@@ -57,17 +51,14 @@ const byte openLED  = 5;        // Open LED connected to D5. PWM Function used f
 
 
 // other constants
-
 const  byte  maxServo = 148;       // fully closed blinds
-const  byte  minServo = 55;        // fully open blinds
+const  byte  minServo = 40;        // fully open blinds
 const  byte  deadBand = 2;         // dead band, if the change to servos is less than this dont move the blinds, prevents fluttering back and forth when light is fluctutating (partly cloudy day)
 const  byte  deadBandLimit = 75;   // if LDR value is less than deadBand for more than this many loops, move the blinds anyway, means its stabilized
-
 
 const unsigned int brightnessStartThresh = 350;   //start closing blinds when LDR value reaches brightness
 const unsigned int brightnessEndThresh = 620;     //close blinds fully at when LDR value reaches brightness
 const unsigned int darknessThreshold = 10;        //close blinds fully at when LDR value reaches darkness
-
 const unsigned int moveDelay = 750;               //delay to allow servo to move a few degrees based on sunlight
 const unsigned int openCloseDelay = 1000;         //delay to allow servo to open or close fully
 const unsigned int loopDelay = 150;               ///delay between loop reads can increase for faster response
@@ -76,24 +67,17 @@ const unsigned long printDelay = 10000UL;         // delay to print status every
 
 
 // global variables
-boolean firstRun = true;            // boolean to store state
-boolean manualMode = false;         // boolean to store auto/manual mode switch's state
-boolean openClose = false;          // boolean to store open/close mode switch's state
-boolean antiFlutter = false;
-boolean isClosed;                   // boolean to store state of blinds
+bool manualMode = false;         // bool to store auto/manual mode switch's state
+bool openClose = false;          // bool to store open/close mode switch's state
+bool antiFlutter = false;
+bool isClosed = false ;          // bool to store state of blinds
 unsigned int ldrValue = 0;          // current LDR value
 byte oldServPos  = minServo;        // previous servo position
-byte servoPos = minServo;            // current servo position
+byte servoPos = minServo;           // current servo position
 byte deadBandCounter = 0;           // counter to count deadband hits
 
 // global variables for input smoothing
-
-const byte numReadings = 20;          // number of readings to average over
 const byte alpha = 4;                 // alpha value to smooth readings over
-unsigned int readings[numReadings];   // the readings from the analog input
-unsigned int index = 0;               // the index of the current reading
-unsigned long total = 0UL;            // the running total using long incase of larger number of readings
-unsigned int average = 0;             // smoothing moving average
 unsigned int smoothed = 0;            // weighted expoenential smoothing
 
 // Timers and events
@@ -103,22 +87,15 @@ int moveBlindsEvent;
 int printStatusEvent; 
 int pulseLEDevent; 
 
-
-
-// Testing Framework
-//#define DEBUG
-
-#ifdef TESTING_MODE
-int t_run_number = 0;
-int t_myldrValue = 0;
-#endif
+//#define TESTING_MODE            // Enable Testing mode
+//#define DEBUG                   // Enable Debugging 
 
 
 void setup()
 {
 
   Serial.begin(9600);
-  Serial.println("Yet Another Blind Minder Copyright (C) 2014 vajonam");
+  Serial.println("Yet Another Blind Minder Copyright (C) vajonam");
   Serial.println("");
   Serial.println("This program comes with ABSOLUTELY NO WARRANTY;.");
   Serial.println("This is free software, and you are welcome to redistribute it");
@@ -129,26 +106,28 @@ void setup()
   pinMode(autoSwitch, INPUT_PULLUP);
   pinMode(openCloseSwitch, INPUT_PULLUP);
 
-  for (int thisReading = 0; thisReading < numReadings; thisReading++)
-    readings[thisReading] = 0;
-
   checkInputEvent = timer.every(loopDelay / 6, checkInput, (void*)0);
   moveBlindsEvent = timer.every(loopDelay, moveBlinds, (void*)0);
   printStatusEvent = timer.every(printDelay, printStatus, (void*)0);
   pulseLEDevent = timer.every(loopDelay / 4, updateLED, (void*)0);
 
+  // seed exponential smoothing
+  smoothed = analogRead(ldrAnalogPin);
+  delay(1);
+ 
 }
 
 void loop()
 {
   timer.update();
-
 }
 
 void checkInput(void *context) {
 
-  manualMode = (boolean) digitalRead(autoSwitch);
-  openClose = (boolean) !digitalRead(openCloseSwitch);
+  manualMode = (bool) digitalRead(autoSwitch);
+  openClose = (bool) !digitalRead(openCloseSwitch);
+  ldrValue = analogRead(ldrAnalogPin);
+  delay(1);
 
 #ifdef DEBUG
   Serial.print("Manual-" + (String) manualMode);
@@ -158,14 +137,11 @@ void checkInput(void *context) {
 #endif
 
 
-  ldrValue = analogRead(ldrAnalogPin);
 #ifdef TESTING_MODE
   ldrValue = testGenerator();
 #endif
 
-
   ldrValue = expSmoothing(ldrValue); // weighted smoothing to get rid of noise
-  ldrValue = avgSmoothing(ldrValue);    // avg smoothing to get rid of fluctiations
 
 
 }
@@ -183,17 +159,19 @@ void moveBlinds (void *context) {
         openCloseBlinds(true);
     }
   } else {
-    //if outside is bright greater than start thresh but still not bright enough to close
+    //if outside is brightness is greater than start thresh but still not bright enough to close
+    //eg: mid morning to evening
     if (ldrValue >= brightnessStartThresh && ldrValue <= brightnessEndThresh )  {
       adjustBlinds();
     }
     //if outside is very dark or very bright, close the blinds fully
+    //eg: late at night till the next morning
     if ( (ldrValue < darknessThreshold || ldrValue > brightnessEndThresh ) && !isClosed && !antiFlutter)  {
       openCloseBlinds(false);
     }
 
     //if outside is resonably bright open the blinds.
-    //Serial.println("Is Closed" + (String) isClosed);
+    //eg: early morning to about mid morning in the summer
     if ((ldrValue >= darknessThreshold && ldrValue < brightnessStartThresh) && isClosed && !antiFlutter) {
       openCloseBlinds(true);
     }
@@ -209,9 +187,7 @@ void adjustBlinds() {
   servoPos = map(ldrValue, brightnessStartThresh, brightnessEndThresh, minServo, maxServo);
   servoPos = constrain(servoPos, minServo, maxServo);
 
-  // when are adjusting we are open
-  isClosed = false;
-  
+ 
   int difference = oldServPos - servoPos;
   difference = abs(difference); // doesn't matter if less or more by 10000the deadband
 
@@ -228,6 +204,13 @@ void adjustBlinds() {
       deadBandCounter++; // increment the deadband counter because we have been through one cycle
     }
   }
+  
+  // if we have reached our max 
+  if (servoPos == maxServo )
+   isClosed = true;
+  else
+    isClosed = false;
+    
 }
 
 
@@ -243,7 +226,7 @@ void moveServo(int position, int moveDelay) {
 
 }
 
-void openCloseBlinds(boolean open) {
+void openCloseBlinds(bool open) {
   if (open) {
     moveServo(minServo,openCloseDelay);
     isClosed = false;
@@ -254,7 +237,7 @@ void openCloseBlinds(boolean open) {
     isClosed = true;
     Serial.println ((String) "Blinds are fully closed");
   }
-  if (!manualMode && !firstRun) {
+  if (!manualMode) {
     antiFlutter = true;
     antiFlutterEvent = timer.after(antiFlutterDelay, clearFlutterFlag, (void*)0);
     Serial.println("Enabling Anti Flutter");
@@ -269,7 +252,6 @@ void clearFlutterFlag(void *context) {
 
 
 // taken from credit goes to http://www.tigoe.com/pcomp/code/arduinowiring/41/
-
 int expSmoothing (int ldrValue) {
 
 
@@ -283,42 +265,12 @@ int expSmoothing (int ldrValue) {
 
 
 
-
-// taken from http://arduino.cc/en/Tutorial/Smoothing
-
-int avgSmoothing(int ldrValue) {
-  
-  // subtract the last reading:
-  total = total - readings[index];
-
-  // store value in array
-  readings[index] = ldrValue;
-
-  // add the reading to the total:
-  total = total + (unsigned long) readings[index];
-
-  // advance to the next position in the array:
-  index = index + 1;
-
-  // if we're at the end of the array...
-  if (index >= numReadings)
-    // ...wrap around to the beginning:
-    index = 0;
-
-  // calculate the average:
-  average = total / numReadings;
-
-
-  return average;
-}
-
 void printStatus (void *context) {
-
 #ifdef TESTING_MODE
   Serial.print(" Free Ram: " + freeRam());
 #endif
-  Serial.print( (String)"LDR: " + (String) ldrValue + (String)" Avg: " +  (String)  average );
-  Serial.println ((String) " Prev Servo Pos : " + (String) oldServPos  + (String) " Cur Servo Pos: " + (String)   servoPos);
+  Serial.print(  "Smooth LDR: " +  (String)  smoothed );
+  Serial.println ((String) " Cur Servo Pos: " + (String)   servoPos);
 }
 
 
@@ -329,39 +281,38 @@ void updateLED (void *context) {
     if (isClosed) {
       digitalWrite(openLED, LOW);
       analogWrite(closeLED, ledVal);
-    }
-    else {
+    } else {
       digitalWrite(closeLED, LOW);
       analogWrite(openLED, ledVal);
-
     }
-  }
-  else if (antiFlutter) {
-    if (isClosed) {
-      digitalWrite(openLED, LOW);
-      digitalWrite(closeLED, HIGH);
-    }
-    else {
-      digitalWrite(openLED, HIGH);
-      digitalWrite(closeLED, LOW);
-
-    }
-  }
-  else {
-    float ledVal = (exp(sin(millis() / 2000.0 * PI)) - 0.36787944) * 108.0;
-    if (isClosed) {
-      digitalWrite(openLED, LOW);
-      analogWrite(closeLED, ledVal);
-    }
-    else {
-      digitalWrite(closeLED, LOW);
-      analogWrite(openLED, ledVal);
+  } else {
+    if (antiFlutter) {
+      if (isClosed) {
+        digitalWrite(openLED, LOW);
+        digitalWrite(closeLED, HIGH);
+      } else {
+        digitalWrite(openLED, HIGH);
+        digitalWrite(closeLED, LOW);
+      }
+    } else {
+      float ledVal = (exp(sin(millis() / 2000.0 * PI)) - 0.36787944) * 108.0;
+      if (isClosed) {
+        digitalWrite(openLED, LOW);
+        analogWrite(closeLED, ledVal);
+      } else {
+        digitalWrite(closeLED, LOW);
+        analogWrite(openLED, ledVal);
+      }
     }
   }
 }
 
 
 #ifdef TESTING_MODE
+// Testing Framework
+
+int t_run_number = 0;
+int t_myldrValue = 0;
 
 // test LDR value generator, starts from 0 to brightnessEndThresh+100, so it will create a set of pseudo-randmon values in clusters of
 // t_cluster, and then move the window for the randmon numbers. This simulators the LDR reistor jumping around a bit and also sunrise to sunset.
@@ -379,14 +330,14 @@ int testGenerator() {
   if ( (t_run_number % 2) == 0 ) {
 
     t_myldrValue++;
-    if (t_myldrValue > brightnessEndThresh) {
+    if (t_myldrValue > brightnessEndThresh+100) {
       t_run_number++;
       delay(1000);
     }
 
   } else {
     t_myldrValue--;
-    if (t_myldrValue < -200) {
+    if (t_myldrValue < 0) {
       delay(1000);
       t_run_number++;
     }
@@ -399,7 +350,6 @@ int testGenerator() {
   return t_myldrValue;
 
 }
-
 #endif
 
 
