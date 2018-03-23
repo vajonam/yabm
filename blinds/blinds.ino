@@ -77,8 +77,16 @@ byte servoPos = minServo;           // current servo position
 byte deadBandCounter = 0;           // counter to count deadband hits
 
 // global variables for input smoothing
-const byte alpha = 4;                 // alpha value to smooth readings over
+const byte alpha = 8;                 // alpha value to smooth readings over
 unsigned int smoothed = 0;            // weighted expoenential smoothing
+
+// globals for avg smoothings
+const byte numReadings = 30;     // number of readings to average over
+unsigned int readings[numReadings];      // the readings from the analog input
+unsigned int index = 0;                  // the index of the current reading
+unsigned long total = 0L;       // the running total using long incase of larger number of readings
+unsigned int average = 0;                // smoothing moving average
+
 
 // Timers and events
 int antiFlutterEvent;
@@ -115,6 +123,8 @@ void setup()
   smoothed = analogRead(ldrAnalogPin);
   delay(1);
  
+   for (int thisReading = 0; thisReading < numReadings; thisReading++)
+    readings[thisReading] = 0;
 }
 
 void loop()
@@ -141,7 +151,8 @@ void checkInput(void *context) {
   ldrValue = testGenerator();
 #endif
 
-  ldrValue = expSmoothing(ldrValue); // weighted smoothing to get rid of noise
+  ldrValue = expSmoothing(ldrValue);    // weighted smoothing to get rid of noise
+  ldrValue = avgSmoothing(ldrValue);    // avg smoothing to get rid of fluctiations
 
 
 }
@@ -192,13 +203,16 @@ void adjustBlinds() {
   difference = abs(difference); // doesn't matter if less or more by 10000the deadband
 
   if (difference > deadBand) {  // opening blinds because the increment is > deadBand
-    Serial.println ((String) "Moving  form : " + (String) oldServPos  + (String) " to " + (String)   servoPos );
+    Serial.print ((String) "Moving  form : " + (String) oldServPos );
     moveServo(servoPos,moveDelay);
+    Serial.println ((String) " to " + (String)   servoPos );
+
   } else {
     if (difference > 0) {
       if (deadBandCounter >= deadBandLimit) {
-        Serial.println ((String) "Dead Band Limit Reached moving " + (String) oldServPos  + (String) " to " + (String)   servoPos );
+        Serial.print ((String) "Dead Band Limit Reached moving " + (String) oldServPos);
         moveServo(servoPos,moveDelay);
+        Serial.println((String) " to " + (String)   servoPos );
         deadBandCounter = 0;
       }
       deadBandCounter++; // increment the deadband counter because we have been through one cycle
@@ -206,8 +220,10 @@ void adjustBlinds() {
   }
   
   // if we have reached our max 
-  if (servoPos == maxServo )
-   isClosed = true;
+  if (servoPos == maxServo ) {
+    Serial.println("Blinds are closed");
+    isClosed = true;
+  }
   else
     isClosed = false;
     
@@ -223,6 +239,7 @@ void moveServo(int position, int moveDelay) {
   oldServPos  =  position;
   servoPos = position;
   myservo.detach();
+  delay(moveDelay);
 
 }
 
@@ -254,7 +271,6 @@ void clearFlutterFlag(void *context) {
 // taken from credit goes to http://www.tigoe.com/pcomp/code/arduinowiring/41/
 int expSmoothing (int ldrValue) {
 
-
   if (ldrValue > smoothed)
     smoothed = smoothed + (ldrValue - smoothed) / alpha ;
   else
@@ -263,9 +279,36 @@ int expSmoothing (int ldrValue) {
   return smoothed;
 }
 
+// taken from http://arduino.cc/en/Tutorial/Smoothing
+
+int avgSmoothing(int ldrValue) {
+  // subtract the last reading:
+  total = total - readings[index];
+  // read from the sensor:
+  //ldrValue = analogRead(inputPin);
+
+  readings[index] = ldrValue;
+  // add the reading to the total:
+  total = total + readings[index];
+  // advance to the next position in the array:
+  index = index + 1;
+
+  // if we're at the end of the array...
+  if (index >= numReadings)
+    // ...wrap around to the beginning:
+    index = 0;
+
+  // calculate the average:
+  average = total / numReadings;
+  // send it to the computer as ASCII digits
+
+
+  return average;
+}
 
 
 void printStatus (void *context) {
+
 #ifdef TESTING_MODE
   Serial.print(" Free Ram: " + freeRam());
 #endif
@@ -314,7 +357,7 @@ void updateLED (void *context) {
 int t_run_number = 0;
 int t_myldrValue = 0;
 
-// test LDR value generator, starts from 0 to brightnessEndThresh+100, so it will create a set of pseudo-randmon values in clusters of
+// test LDR value generator, starts faverom 0 to brightnessEndThresh+100, so it will create a set of pseudo-randmon values in clusters of
 // t_cluster, and then move the window for the randmon numbers. This simulators the LDR reistor jumping around a bit and also sunrise to sunset.
 // can be improved on.
 
@@ -325,7 +368,6 @@ int freeRam () {
 }
 
 int testGenerator() {
-
 
   if ( (t_run_number % 2) == 0 ) {
 
@@ -343,7 +385,6 @@ int testGenerator() {
     }
 
   }
-
 
   Serial.println((String)" Test ldrValue : " +  (String)  t_myldrValue );
 
