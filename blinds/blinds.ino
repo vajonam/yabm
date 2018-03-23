@@ -51,8 +51,8 @@ const byte openLED  = 5;        // Open LED connected to D5. PWM Function used f
 
 
 // other constants
-const  byte  maxServo = 148;       // fully closed blinds
-const  byte  minServo = 40;        // fully open blinds
+const  byte  maxServo = 0;       // fully closed blinds
+const  byte  minServo = 100;        // fully open blinds
 const  byte  deadBand = 2;         // dead band, if the change to servos is less than this dont move the blinds, prevents fluttering back and forth when light is fluctutating (partly cloudy day)
 const  byte  deadBandLimit = 75;   // if LDR value is less than deadBand for more than this many loops, move the blinds anyway, means its stabilized
 
@@ -92,11 +92,12 @@ unsigned int average = 0;                // smoothing moving average
 int antiFlutterEvent;
 int checkInputEvent;
 int moveBlindsEvent;
-int printStatusEvent; 
-int pulseLEDevent; 
+int printStatusEvent;
+int pulseLEDevent;
+int servoDetachEvent;
 
 //#define TESTING_MODE            // Enable Testing mode
-//#define DEBUG                   // Enable Debugging 
+//#define DEBUG                   // Enable Debugging
 
 
 void setup()
@@ -122,8 +123,8 @@ void setup()
   // seed exponential smoothing
   smoothed = analogRead(ldrAnalogPin);
   delay(1);
- 
-   for (int thisReading = 0; thisReading < numReadings; thisReading++)
+
+  for (int thisReading = 0; thisReading < numReadings; thisReading++)
     readings[thisReading] = 0;
 }
 
@@ -165,14 +166,14 @@ void moveBlinds (void *context) {
     if (!openClose && !isClosed  )   {
       openCloseBlinds(false);
     }
-   // if the auto mode switch is manual and the open/close switch is open
+    // if the auto mode switch is manual and the open/close switch is open
     if (openClose && isClosed) {
-        openCloseBlinds(true);
+      openCloseBlinds(true);
     }
   } else {
     //if outside is brightness is greater than start thresh but still not bright enough to close
     //eg: mid morning to evening
-    if (ldrValue >= brightnessStartThresh && ldrValue <= brightnessEndThresh )  {
+    if (ldrValue >= brightnessStartThresh && ldrValue <= brightnessEndThresh && !antiFlutter )  {
       adjustBlinds();
     }
     //if outside is very dark or very bright, close the blinds fully
@@ -198,35 +199,35 @@ void adjustBlinds() {
   servoPos = map(ldrValue, brightnessStartThresh, brightnessEndThresh, minServo, maxServo);
   servoPos = constrain(servoPos, minServo, maxServo);
 
- 
+
   int difference = oldServPos - servoPos;
   difference = abs(difference); // doesn't matter if less or more by 10000the deadband
 
   if (difference > deadBand) {  // opening blinds because the increment is > deadBand
     Serial.print ((String) "Moving  form : " + (String) oldServPos );
-    moveServo(servoPos,moveDelay);
+    moveServo(servoPos, moveDelay);
     Serial.println ((String) " to " + (String)   servoPos );
 
   } else {
     if (difference > 0) {
       if (deadBandCounter >= deadBandLimit) {
         Serial.print ((String) "Dead Band Limit Reached moving " + (String) oldServPos);
-        moveServo(servoPos,moveDelay);
+        moveServo(servoPos, moveDelay);
         Serial.println((String) " to " + (String)   servoPos );
         deadBandCounter = 0;
       }
       deadBandCounter++; // increment the deadband counter because we have been through one cycle
     }
   }
-  
-  // if we have reached our max 
+
+  // if we have reached our max
   if (servoPos == maxServo ) {
     Serial.println("Blinds are closed");
     isClosed = true;
   }
   else
     isClosed = false;
-    
+
 }
 
 
@@ -235,22 +236,20 @@ void moveServo(int position, int moveDelay) {
 
   myservo.attach(servoPin);
   myservo.write(position);
-  delay(moveDelay);
+  servoDetachEvent = timer.after(moveDelay, detachServo, (void*)0);
   oldServPos  =  position;
   servoPos = position;
-  myservo.detach();
-  delay(moveDelay);
 
 }
 
 void openCloseBlinds(bool open) {
   if (open) {
-    moveServo(minServo,openCloseDelay);
+    moveServo(minServo, openCloseDelay);
     isClosed = false;
     Serial.println((String) "Blinds are fully open");
   }
   else  {
-    moveServo(maxServo,openCloseDelay);
+    moveServo(maxServo, openCloseDelay);
     isClosed = true;
     Serial.println ((String) "Blinds are fully closed");
   }
@@ -260,6 +259,11 @@ void openCloseBlinds(bool open) {
     Serial.println("Enabling Anti Flutter");
   }
 }
+
+void detachServo (void *context) {
+  myservo.detach();
+}
+
 
 void clearFlutterFlag(void *context) {
   antiFlutter = false;
@@ -372,7 +376,7 @@ int testGenerator() {
   if ( (t_run_number % 2) == 0 ) {
 
     t_myldrValue++;
-    if (t_myldrValue > brightnessEndThresh+100) {
+    if (t_myldrValue > brightnessEndThresh + 100) {
       t_run_number++;
       delay(1000);
     }
