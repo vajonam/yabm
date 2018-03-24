@@ -56,9 +56,9 @@ const  byte  servoOpen = 100;        // fully open blinds
 const  byte  deadBand = 2;         // dead band, if the change to servos is less than this dont move the blinds, prevents fluttering back and forth when light is fluctutating (partly cloudy day)
 const  byte  deadBandLimit = 75;   // if LDR value is less than deadBand for more than this many loops, move the blinds anyway, means its stabilized
 
-const unsigned int brightnessStartThresh = 350;   //start closing blinds when LDR value reaches brightness
+const unsigned int brightnessStartThresh = 300;   //start closing blinds when LDR value reaches brightness
 const unsigned int brightnessEndThresh = 620;     //close blinds fully at when LDR value reaches brightness
-const unsigned int darknessThreshold = 10;        //close blinds fully at when LDR value reaches darkness
+const unsigned int darknessThreshold = 15;        //close blinds fully at when LDR value reaches darkness
 const unsigned int moveDelay = 750;               //delay to allow servo to move a few degrees based on sunlight
 const unsigned int openCloseDelay = 1000;         //delay to allow servo to open or close fully
 const unsigned int loopDelay = 150;               ///delay between loop reads can increase for faster response
@@ -94,8 +94,7 @@ int checkInputEvent;
 int moveBlindsEvent;
 int printStatusEvent;
 int pulseLEDevent;
-int servoDetachEvent;
-
+ 
 //#define TESTING_MODE            // Enable Testing mode
 //#define DEBUG                   // Enable Debugging
 
@@ -126,6 +125,9 @@ void setup()
 
   for (int thisReading = 0; thisReading < numReadings; thisReading++)
     readings[thisReading] = 0;
+
+  myservo.attach(servoPin);
+  
 }
 
 void loop()
@@ -221,8 +223,8 @@ void adjustBlinds() {
   }
 
   // if we have reached our max
-  if (servoPos == servoClosed ) {
-    Serial.println("Blinds are closed");
+  if (servoPos == servoClosed) {
+    // Serial.println("Blinds are closed");
     isClosed = true;
   }
   else
@@ -234,9 +236,7 @@ void adjustBlinds() {
 
 void moveServo(int position, int moveDelay) {
 
-  myservo.attach(servoPin);
   myservo.write(position);
-  servoDetachEvent = timer.after(moveDelay, detachServo, (void*)0);
   oldServPos  =  position;
   servoPos = position;
 
@@ -258,10 +258,6 @@ void openCloseBlinds(bool open) {
     antiFlutterEvent = timer.after(antiFlutterDelay, clearFlutterFlag, (void*)0);
     Serial.println("Enabling Anti Flutter");
   }
-}
-
-void detachServo (void *context) {
-  myservo.detach();
 }
 
 
@@ -318,6 +314,7 @@ void printStatus (void *context) {
 #endif
   Serial.print(  "Brightness: " +  (String)  map(smoothed,darknessThreshold,brightnessEndThresh,0,100 ) + "%" + "(" + (String) smoothed +  ")" );
   Serial.println ((String) " Servo: " + (String)   map(servoPos,servoOpen,servoClosed,0,100) +"%" + "(" + (String) servoPos +  ")");
+  
 }
 
 
