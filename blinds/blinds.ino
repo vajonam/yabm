@@ -51,8 +51,8 @@ const byte openLED  = 5;        // Open LED connected to D5. PWM Function used f
 
 
 // other constants
-const  byte  maxServo = 0;       // fully closed blinds
-const  byte  minServo = 100;        // fully open blinds
+const  byte  servoClosed = 0;       // fully closed blinds
+const  byte  servoOpen = 100;        // fully open blinds
 const  byte  deadBand = 2;         // dead band, if the change to servos is less than this dont move the blinds, prevents fluttering back and forth when light is fluctutating (partly cloudy day)
 const  byte  deadBandLimit = 75;   // if LDR value is less than deadBand for more than this many loops, move the blinds anyway, means its stabilized
 
@@ -72,8 +72,8 @@ bool openClose = false;          // bool to store open/close mode switch's state
 bool antiFlutter = false;
 bool isClosed = false ;          // bool to store state of blinds
 unsigned int ldrValue = 0;          // current LDR value
-byte oldServPos  = minServo;        // previous servo position
-byte servoPos = minServo;           // current servo position
+byte oldServPos  = servoOpen;        // previous servo position
+byte servoPos = servoOpen;           // current servo position
 byte deadBandCounter = 0;           // counter to count deadband hits
 
 // global variables for input smoothing
@@ -196,10 +196,10 @@ void moveBlinds (void *context) {
 
 void adjustBlinds() {
 
-  servoPos = map(ldrValue, brightnessStartThresh, brightnessEndThresh, minServo, maxServo);
-  servoPos = constrain(servoPos, minServo, maxServo);
+  servoPos = map(ldrValue, brightnessEndThresh, brightnessStartThresh,servoClosed, servoOpen);
+  servoPos = constrain(servoPos, servoClosed, servoOpen);
 
-
+  
   int difference = oldServPos - servoPos;
   difference = abs(difference); // doesn't matter if less or more by 10000the deadband
 
@@ -221,7 +221,7 @@ void adjustBlinds() {
   }
 
   // if we have reached our max
-  if (servoPos == maxServo ) {
+  if (servoPos == servoClosed ) {
     Serial.println("Blinds are closed");
     isClosed = true;
   }
@@ -244,12 +244,12 @@ void moveServo(int position, int moveDelay) {
 
 void openCloseBlinds(bool open) {
   if (open) {
-    moveServo(minServo, openCloseDelay);
+    moveServo(servoOpen, openCloseDelay);
     isClosed = false;
     Serial.println((String) "Blinds are fully open");
   }
   else  {
-    moveServo(maxServo, openCloseDelay);
+    moveServo(servoClosed, openCloseDelay);
     isClosed = true;
     Serial.println ((String) "Blinds are fully closed");
   }
