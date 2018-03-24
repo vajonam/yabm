@@ -199,7 +199,7 @@ void adjustBlinds() {
   servoPos = map(ldrValue, brightnessEndThresh, brightnessStartThresh,servoClosed, servoOpen);
   servoPos = constrain(servoPos, servoClosed, servoOpen);
 
-  
+    
   int difference = oldServPos - servoPos;
   difference = abs(difference); // doesn't matter if less or more by 10000the deadband
 
@@ -316,8 +316,8 @@ void printStatus (void *context) {
 #ifdef TESTING_MODE
   Serial.print(" Free Ram: " + freeRam());
 #endif
-  Serial.print(  "Smooth LDR: " +  (String)  smoothed );
-  Serial.println ((String) " Cur Servo Pos: " + (String)   servoPos);
+  Serial.print(  "Brightness: " +  (String)  map(smoothed,darknessThreshold,brightnessEndThresh,0,100 ) + "%" + "(" + (String) smoothed +  ")" );
+  Serial.println ((String) " Servo: " + (String)   map(servoPos,servoOpen,servoClosed,0,100) +"%" + "(" + (String) servoPos +  ")");
 }
 
 
