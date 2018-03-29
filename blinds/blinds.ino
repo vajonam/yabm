@@ -59,11 +59,9 @@ const  byte  deadBandLimit = 75;   // if LDR value is less than deadBand for mor
 const unsigned int brightnessStartThresh = 300;   //start closing blinds when LDR value reaches brightness
 const unsigned int brightnessEndThresh = 620;     //close blinds fully at when LDR value reaches brightness
 const unsigned int darknessThreshold = 15;        //close blinds fully at when LDR value reaches darkness
-const unsigned int moveDelay = 750;               //delay to allow servo to move a few degrees based on sunlight
-const unsigned int openCloseDelay = 1000;         //delay to allow servo to open or close fully
-const unsigned int loopDelay = 150;               ///delay between loop reads can increase for faster response
-const unsigned long antiFlutterDelay = 120000UL;  //stop blinds from flutter at edge points.
-const unsigned long printDelay = 10000UL;         // delay to print status every 10 seconds.
+const unsigned int loopInterval = 150;               // interval between loop reads can increase for faster response
+const unsigned long flutterCooldown = 120000UL;  //stop blinds from flutter at edge points.
+const unsigned long printInterval = 10000UL;         // interval  to print status every 10 seconds.
 
 
 // global variables
@@ -114,10 +112,10 @@ void setup()
   pinMode(autoSwitch, INPUT_PULLUP);
   pinMode(openCloseSwitch, INPUT_PULLUP);
 
-  checkInputEvent = timer.every(loopDelay / 6, checkInput, (void*)0);
-  moveBlindsEvent = timer.every(loopDelay, moveBlinds, (void*)0);
-  printStatusEvent = timer.every(printDelay, printStatus, (void*)0);
-  pulseLEDevent = timer.every(loopDelay / 4, updateLED, (void*)0);
+  checkInputEvent = timer.every(loopInterval / 6, checkInput, (void*)0);
+  moveBlindsEvent = timer.every(loopInterval, moveBlinds, (void*)0);
+  printStatusEvent = timer.every(printInterval, printStatus, (void*)0);
+  pulseLEDevent = timer.every(loopInterval / 4, updateLED, (void*)0);
 
   // seed exponential smoothing
   smoothed = analogRead(ldrAnalogPin);
@@ -207,14 +205,14 @@ void adjustBlinds() {
 
   if (difference > deadBand) {  // opening blinds because the increment is > deadBand
     Serial.print ((String) "Moving  form : " + (String) oldServPos );
-    moveServo(servoPos, moveDelay);
+    moveServo(servoPos);
     Serial.println ((String) " to " + (String)   servoPos );
 
   } else {
     if (difference > 0) {
       if (deadBandCounter >= deadBandLimit) {
         Serial.print ((String) "Dead Band Limit Reached moving " + (String) oldServPos);
-        moveServo(servoPos, moveDelay);
+        moveServo(servoPos);
         Serial.println((String) " to " + (String)   servoPos );
         deadBandCounter = 0;
       }
@@ -234,7 +232,7 @@ void adjustBlinds() {
 
 
 
-void moveServo(int position, int moveDelay) {
+void moveServo(int position) {
 
   myservo.write(position);
   oldServPos  =  position;
@@ -244,18 +242,18 @@ void moveServo(int position, int moveDelay) {
 
 void openCloseBlinds(bool open) {
   if (open) {
-    moveServo(servoOpen, openCloseDelay);
+    moveServo(servoOpen);
     isClosed = false;
     Serial.println((String) "Blinds are fully open");
   }
   else  {
-    moveServo(servoClosed, openCloseDelay);
+    moveServo(servoClosed);
     isClosed = true;
     Serial.println ((String) "Blinds are fully closed");
   }
   if (!manualMode) {
     antiFlutter = true;
-    antiFlutterEvent = timer.after(antiFlutterDelay, clearFlutterFlag, (void*)0);
+    antiFlutterEvent = timer.after(flutterCooldown, clearFlutterFlag, (void*)0);
     Serial.println("Enabling Anti Flutter");
   }
 }
@@ -393,11 +391,5 @@ int testGenerator() {
 
 }
 #endif
-
-
-
-
-
-
 
 
